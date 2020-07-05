@@ -1,4 +1,5 @@
 import torch
+import copy
 from torch import nn
 
 from torch_scatter import scatter_mean, scatter_max, scatter_add
@@ -163,12 +164,19 @@ class MOTMPNet(nn.Module):
         # Define Encoder and Classifier Networks
         encoder_feats_dict = model_params['encoder_feats_dict']
         classifier_feats_dict = model_params['classifier_feats_dict']
+        merge_multiply_dict = model_params['merge_multiply_dict']
 
         self.encoder = MLPGraphIndependent(**encoder_feats_dict)
         self.classifier = MLPGraphIndependent(**classifier_feats_dict)
+        self.merge_fc = nn.Sequential(nn.Linear(merge_multiply_dict['in_dim'], merge_multiply_dict['out_dim']),
+                                       nn.ReLU(inplace=True))
+        self.node_merge_fc = nn.Sequential(nn.Linear(64, 32),
+                                      nn.ReLU(inplace=True))
+
 
         # Define the 'Core' message passing network (i.e. node and edge update models)
         self.MPNet = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
+        self.MPNet_v2 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
 
         self.num_enc_steps = model_params['num_enc_steps']
         self.num_class_steps = model_params['num_class_steps']
@@ -282,7 +290,14 @@ class MOTMPNet(nn.Module):
                 latent_node_feats = torch.cat((initial_node_feats, latent_node_feats), dim=1)
 
             # Message Passing Step
-            latent_node_feats, latent_edge_feats = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
+            latent_node_feats_v1, latent_edge_feats_v1 = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
+            latent_node_feats_v2, latent_edge_feats_v2 = self.MPNet_v2(latent_node_feats, edge_index, latent_edge_feats)
+
+            #Concatenate multiply MPN
+            latent_node_feats = torch.cat([latent_node_feats_v1, latent_node_feats_v2], dim=1)
+            latent_edge_feats = torch.cat([latent_edge_feats_v1, latent_edge_feats_v2], dim=1)
+            latent_node_feats = self.node_merge_fc(latent_node_feats)
+            latent_edge_feats = self.merge_fc(latent_edge_feats)
 
             if step >= first_class_step:
                 # Classification Step

@@ -141,6 +141,12 @@ graph_model_params:
     dropout_p: 0
     use_batchnorm: False
 
+  merge_multiply_dict:
+    in_dim: 32
+    out_dim: 16
+    dropout_p: 0
+    use_batchnorm: False
+
   cnn_params:
     arch: resnet50
     model_weights_path:
