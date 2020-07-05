@@ -31,7 +31,7 @@ def main(_config, _run):
     out_files_dir = osp.join(save_dir, 'mot_files')
 
     # Load model from checkpoint and update config entries that may vary from the ones used in training
-    model = MOTNeuralSolver.load_from_checkpoint(checkpoint_path=_config['ckpt_path'] if osp.exists(_config['ckpt_path'])  else osp.join(OUTPUT_PATH, _config['ckpt_path']))
+    model = MOTNeuralSolver.load_from_checkpoint(checkpoint_path=_config['ckpt_path'] if osp.exists(_config['ckpt_path']) else osp.join(OUTPUT_PATH, _config['ckpt_path']))
     model.hparams.update({'eval_params':_config['eval_params'],
                           'data_splits':_config['data_splits']})
     model.hparams['dataset_params']['precomputed_embeddings'] = _config['precomputed_embeddings']

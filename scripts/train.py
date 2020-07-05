@@ -1,6 +1,11 @@
 import sacred
 from sacred import Experiment
 
+# import pandas as pd
+# seq_det_df = pd.read_pickle("/home/liuyuting/Code/mot_neural_solver/data/MOT17Labels/test/MOT17-01-DPM/processed_data/det/tracktor_prepr_det.pkl")
+# seq_info_dicts = seq_det_df.seq_info_dict
+# print(seq_det_df)
+
 from mot_neural_solver.utils.evaluation import MOTMetricsLogger
 from mot_neural_solver.utils.misc import make_deterministic, get_run_str_and_save_dir, ModelCheckpoint
 
@@ -53,7 +58,7 @@ def main(_config, _run):
     sacred.commands.print_config(_run)
     make_deterministic(12345)
 
-    model = MOTNeuralSolver(hparams = dict(_config))
+    model = MOTNeuralSolver(hparams=dict(_config))
 
     run_str, save_dir = get_run_str_and_save_dir(_config['run_id'], _config['cross_val_split'], _config['add_date'])
 
@@ -63,18 +68,18 @@ def main(_config, _run):
     else:
         logger = None
 
-    ckpt_callback = ModelCheckpoint(save_epoch_start = _config['train_params']['save_epoch_start'],
-                                    save_every_epoch = _config['train_params']['save_every_epoch'])
+    ckpt_callback = ModelCheckpoint(save_epoch_start=_config['train_params']['save_epoch_start'],
+                                    save_every_epoch=_config['train_params']['save_every_epoch'])
 
     trainer = Trainer(gpus=1,
-                      callbacks=[MOTMetricsLogger(compute_oracle_results = _config['eval_params']['normalize_mot_metrics']), ckpt_callback],
-                      weights_summary = None,
+                      callbacks=[MOTMetricsLogger(compute_oracle_results=_config['eval_params']['normalize_mot_metrics']), ckpt_callback],
+                      weights_summary=None,
                       checkpoint_callback=False,
                       max_epochs=_config['train_params']['num_epochs'],
-                      val_percent_check = _config['eval_params']['val_percent_check'],
+                      val_percent_check=_config['eval_params']['val_percent_check'],
                       check_val_every_n_epoch=_config['eval_params']['check_val_every_n_epoch'],
                       nb_sanity_val_steps=0,
-                      logger =logger,
+                      logger=logger,
                       default_save_path=osp.join(OUTPUT_PATH, 'experiments', run_str))
     trainer.fit(model)
 

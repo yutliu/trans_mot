@@ -108,6 +108,7 @@ def get_mot17_det_df(seq_name, data_root_path, dataset_params):
     det_df = pd.read_csv(detections_file_path, header=None)
 
     # Number and order of columns is always assumed to be the same
+    # DET_COL_NAMES = ('frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf')
     det_df = det_df[det_df.columns[:len(DET_COL_NAMES)]]
     det_df.columns = DET_COL_NAMES
 

@@ -213,21 +213,22 @@ class MOTMPNet(nn.Module):
         node_model_feats_dict = model_params['node_model_feats_dict']
 
         edge_mlp = MLP(input_dim=edge_model_in_dim,
-                       fc_dims=edge_model_feats_dict['fc_dims'],
+                       fc_dims=edge_model_feats_dict['fc_dims'], #[80, 16]
                        dropout_p=edge_model_feats_dict['dropout_p'],
                        use_batchnorm=edge_model_feats_dict['use_batchnorm'])
 
         flow_in_mlp = MLP(input_dim=node_model_in_dim,
-                          fc_dims=node_model_feats_dict['fc_dims'],
+                          fc_dims=node_model_feats_dict['fc_dims'], #[56, 32]
                           dropout_p=node_model_feats_dict['dropout_p'],
                           use_batchnorm=node_model_feats_dict['use_batchnorm'])
 
         flow_out_mlp = MLP(input_dim=node_model_in_dim,
-                           fc_dims=node_model_feats_dict['fc_dims'],
+                           fc_dims=node_model_feats_dict['fc_dims'], #[56, 32]
                            dropout_p=node_model_feats_dict['dropout_p'],
                            use_batchnorm=node_model_feats_dict['use_batchnorm'])
 
-        node_mlp = nn.Sequential(*[nn.Linear(2 * encoder_feats_dict['node_out_dim'], encoder_feats_dict['node_out_dim']),
+        node_mlp = nn.Sequential(*[nn.Linear(2 * encoder_feats_dict['node_out_dim'],
+                                             encoder_feats_dict['node_out_dim']),
                                    nn.ReLU(inplace=True)])
 
         # Define all MLPs used within the MPN

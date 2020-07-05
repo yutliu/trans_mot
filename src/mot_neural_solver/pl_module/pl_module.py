@@ -38,8 +38,8 @@ class MOTNeuralSolver(pl.LightningModule):
         self.model(x)
 
     def load_model(self):
-        cnn_arch = self.hparams['graph_model_params']['cnn_params']['arch']
-        model =  MOTMPNet(self.hparams['graph_model_params']).cuda()
+        cnn_arch = self.hparams['graph_model_params']['cnn_params']['arch'] #resnet50
+        model = MOTMPNet(self.hparams['graph_model_params']).cuda()
 
         cnn_model = resnet50_fc256(10, loss='xent', pretrained=True).cuda()
         load_pretrained_weights(cnn_model,
