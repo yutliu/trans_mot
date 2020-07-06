@@ -6,7 +6,7 @@ import pandas as pd
 from torch_geometric.data import DataLoader
 
 import torch
-
+import torch.nn as nn
 from torch import optim as optim_module
 from torch.optim import lr_scheduler as lr_sched_module
 from torch.nn import functional as F
@@ -40,6 +40,11 @@ class MOTNeuralSolver(pl.LightningModule):
     def load_model(self):
         cnn_arch = self.hparams['graph_model_params']['cnn_params']['arch'] #resnet50
         model = MOTMPNet(self.hparams['graph_model_params']).cuda()
+
+        #init MOTMPNet
+        # for model_layer1 in model.modules():
+        #     if isinstance(model_layer1, (nn.Conv2d, nn.Linear)):
+        #         nn.init.xavier_uniform_(model_layer1.weight, gain=nn.init.calculate_gain('relu'))
 
         cnn_model = resnet50_fc256(10, loss='xent', pretrained=True).cuda()
         load_pretrained_weights(cnn_model,

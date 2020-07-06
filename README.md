@@ -4,5 +4,7 @@
 
 **way**
 
-``conda search`` 
+``conda search ld_impl_linux-64`` 
+
+change the version of ld_impl_linux-64
 
