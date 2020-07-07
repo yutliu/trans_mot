@@ -88,7 +88,7 @@ eval_params:
   mot_metrics_to_log: ['mota', 'norm_mota', 'idf1', 'norm_idf1', 'num_switches', 'num_misses', 'num_false_positives', 'num_fragmentations', 'constr_sr']
   metrics_to_log: ['loss', 'precision', 'recall', 'constr_sr']
   log_per_seq_metrics: False
-  normalize_mot_metrics: True # Determines whether MOT results are computer via an oracle (i.e. GT labels), in order to
+  normalize_mot_metrics: False # Determines whether MOT results are computer via an oracle (i.e. GT labels), in order to
                               # normalize results. (i.e. what is the best possible MOTA we could get with a set of dets?)
   mot_metrics_to_norm: ['mota', 'idf1']
   best_method_criteria: 'idf1'

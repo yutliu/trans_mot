@@ -1,11 +1,30 @@
 import torch
 import copy
+import time
 from torch import nn
 
 from torch_scatter import scatter_mean, scatter_max, scatter_add
 
 from mot_neural_solver.models.mlp import MLP
 
+def scatter_add_weigh(src: torch.Tensor, index: torch.Tensor, dim: int = 0,
+                      dim_size: int = None,
+                      weigh: torch.Tensor = None) -> torch.Tensor:
+    """according index, add src * weigh"""
+    size = list(src.size())
+    if dim_size is not None:
+        size[dim] = dim_size
+    elif index.numel() == 0:
+        size[dim] = 0
+    else:
+        size[dim] = int(index.max()) + 1
+    out = torch.zeros(size, dtype=src.dtype, device=src.device)
+    if dim == 0:
+        for i in range(src.size()[0]):
+            out[index[i]][:] += weigh[i] * src[i][:]
+    else:
+        raise ValueError("Sorry, I just code a dim")
+    return out
 
 class MetaLayer(torch.nn.Module):
     """
@@ -86,17 +105,18 @@ class TimeAwareNodeModel(nn.Module):
         flow_out_row, flow_out_col = row[flow_out_mask], col[flow_out_mask]
         flow_out_input = torch.cat([x[flow_out_col], edge_attr[flow_out_mask]], dim=1)
         flow_out = self.flow_out_mlp(flow_out_input)
-        flow_out = self.node_agg_fn(flow_out, flow_out_row, x.size(0))
+        # flow_out = self.node_agg_fn(flow_out, flow_out_row, x.size(0))
 
         flow_in_mask = row > col
         flow_in_row, flow_in_col = row[flow_in_mask], col[flow_in_mask]
         flow_in_input = torch.cat([x[flow_in_col], edge_attr[flow_in_mask]], dim=1)
         flow_in = self.flow_in_mlp(flow_in_input)
 
-        flow_in = self.node_agg_fn(flow_in, flow_in_row, x.size(0))
-        flow = torch.cat((flow_in, flow_out), dim=1)
+        # flow_in = self.node_agg_fn(flow_in, flow_in_row, x.size(0))
+        # flow = torch.cat((flow_in, flow_out), dim=1)
 
-        return self.node_mlp(flow)
+        return {'flow_out':flow_out, 'flow_in':flow_in,  'x_size0': x.size(0)}
+        # return self.node_mlp(flow)
 
 class MLPGraphIndependent(nn.Module):
     """
@@ -169,16 +189,17 @@ class MOTMPNet(nn.Module):
 
         self.encoder = MLPGraphIndependent(**encoder_feats_dict)
         self.classifier = MLPGraphIndependent(**classifier_feats_dict)
-        self.edge_merge_fc = MLP(input_dim=edge_merge_multiply_dict['in_dim'],
-                                 fc_dims=edge_merge_multiply_dict['out_dim'])
-        self.node_merge_fc = MLP(input_dim=node_merge_multiply_dict['in_dim'],
-                                 fc_dims=node_merge_multiply_dict['out_dim'])
+        # self.edge_merge_fc = MLP(input_dim=edge_merge_multiply_dict['in_dim'],
+        #                          fc_dims=edge_merge_multiply_dict['out_dim'])
+        # self.node_merge_fc = MLP(input_dim=node_merge_multiply_dict['in_dim'],
+        #                          fc_dims=node_merge_multiply_dict['out_dim'])
 
 
         # Define the 'Core' message passing network (i.e. node and edge update models)
         self.MPNet = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
-        self.MPNet_v2 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
-        self.MPNet_v3 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
+        # self.MPNet_v2 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
+        # self.MPNet_v3 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
+
 
         self.num_enc_steps = model_params['num_enc_steps']
         self.num_class_steps = model_params['num_class_steps']
@@ -204,6 +225,9 @@ class MOTMPNet(nn.Module):
 
         elif node_agg_fn == 'sum':
             node_agg_fn = lambda out, row, x_size: scatter_add(out, row, dim=0, dim_size=x_size)
+            # node_agg_fn = lambda out, row, x_size, weigh: scatter_add_weigh(out, row, dim=0, dim_size=x_size, weigh=weigh)
+
+        self.node_agg_fn = node_agg_fn
 
         # Define all MLPs involved in the graph network
         # For both nodes and edges, the initial encoded features (i.e. output of self.encoder) can either be
@@ -240,6 +264,8 @@ class MOTMPNet(nn.Module):
         node_mlp = nn.Sequential(*[nn.Linear(2 * encoder_feats_dict['node_out_dim'],
                                              encoder_feats_dict['node_out_dim']),
                                    nn.ReLU(inplace=True)])
+
+        self.node_mlp = node_mlp
 
         # Define all MLPs used within the MPN
         return MetaLayer(edge_model=EdgeModel(edge_mlp = edge_mlp),
@@ -282,7 +308,7 @@ class MOTMPNet(nn.Module):
         # During training, the feature vectors that the MPNetwork outputs for the  last self.num_class_steps message
         # passing steps are classified in order to compute the loss.
         first_class_step = self.num_enc_steps - self.num_class_steps + 1
-        outputs_dict = {'classified_edges': []}
+        outputs_dict = {'classified_edges': [], 'node_loss':[]}
         for step in range(1, self.num_enc_steps + 1):
 
             # Reattach the initially encoded embeddings before the update
@@ -292,20 +318,72 @@ class MOTMPNet(nn.Module):
                 latent_node_feats = torch.cat((initial_node_feats, latent_node_feats), dim=1)
 
             # Message Passing Step
-            latent_node_feats_v1, latent_edge_feats_v1 = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
-            latent_node_feats_v2, latent_edge_feats_v2 = self.MPNet_v2(latent_node_feats, edge_index, latent_edge_feats)
-            latent_node_feats_v3, latent_edge_feats_v3 = self.MPNet_v3(latent_node_feats, edge_index, latent_edge_feats)
+            # latent_node_feats_v1, latent_edge_feats_v1 = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
+            # latent_node_feats_v2, latent_edge_feats_v2 = self.MPNet_v2(latent_node_feats, edge_index, latent_edge_feats)
+            # latent_node_feats_v3, latent_edge_feats_v3 = self.MPNet_v3(latent_node_feats, edge_index, latent_edge_feats)
 
             #Concatenate multiply MPN
-            latent_node_feats = torch.cat([latent_node_feats_v1, latent_node_feats_v2, latent_node_feats_v3], dim=1)
-            latent_edge_feats = torch.cat([latent_edge_feats_v1, latent_edge_feats_v2, latent_edge_feats_v3], dim=1)
-            latent_node_feats = self.node_merge_fc(latent_node_feats)
-            latent_edge_feats = self.edge_merge_fc(latent_edge_feats)
+            # latent_node_feats = torch.cat([latent_node_feats_v1, latent_node_feats_v2, latent_node_feats_v3], dim=1)
+            # latent_edge_feats = torch.cat([latent_edge_feats_v1, latent_edge_feats_v2, latent_edge_feats_v3], dim=1)
+            # latent_node_feats = self.node_merge_fc(latent_node_feats)
+            # latent_edge_feats = self.edge_merge_fc(latent_edge_feats)
+
+            #Weighted edge
+
+            node_feats_set, latent_edge_feats = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
 
             if step >= first_class_step:
                 # Classification Step
                 dec_edge_feats, _ = self.classifier(latent_edge_feats)
                 outputs_dict['classified_edges'].append(dec_edge_feats)
+                dec_edge_weigh = nn.Sigmoid()(dec_edge_feats.reshape(-1))
+
+                # when there is edge prediction, update node_feature
+                x_size0 = node_feats_set['x_size0']
+                row, col = edge_index
+                flow_out_mask = row < col
+                flow_out_row, flow_out_col = row[flow_out_mask], col[flow_out_mask]
+                flow_out_edge_weigh = dec_edge_weigh[flow_out_mask]
+                flow_out = node_feats_set['flow_out']
+                # flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0, flow_out_edge_weigh)
+                flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0)
+
+                flow_in_mask = row > col
+                flow_in_row, flow_in_col = row[flow_in_mask], col[flow_in_mask]
+                flow_in_edge_weigh = dec_edge_weigh[flow_in_mask]
+                flow_in = node_feats_set['flow_in']
+                t = time.time()
+                # flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0, flow_in_edge_weigh)
+                flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0)
+                print(f'node_agg_fn function cost {time.time() - t}s')
+
+                flow = torch.cat((flow_in, flow_out), dim=1)
+
+                flow = torch.cat((flow_in, flow_out), dim=1)
+                latent_node_feats = self.node_mlp(flow)
+
+
+            else:
+                #when no edge prediction, update node_feature
+                x_size0 = node_feats_set['x_size0']
+                row, col = edge_index
+                flow_out_mask = row < col
+                flow_out_row, flow_out_col = row[flow_out_mask], col[flow_out_mask]
+                flow_out = node_feats_set['flow_out']
+                # flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0, torch.ones(flow_out.size()[0]).cuda())
+                flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0)
+
+
+                flow_in_mask = row > col
+                flow_in_row, flow_in_col = row[flow_in_mask], col[flow_in_mask]
+                flow_in = node_feats_set['flow_in']
+                # flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0, torch.ones(flow_in.size()[0]).cuda())
+                flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0)
+
+                flow = torch.cat((flow_in, flow_out), dim=1)
+
+                flow = torch.cat((flow_in, flow_out), dim=1)
+                latent_node_feats = self.node_mlp(flow)
 
         if self.num_enc_steps == 0:
             dec_edge_feats, _ = self.classifier(latent_edge_feats)
