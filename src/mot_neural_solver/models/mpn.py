@@ -178,6 +178,7 @@ class MOTMPNet(nn.Module):
         # Define the 'Core' message passing network (i.e. node and edge update models)
         self.MPNet = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
         self.MPNet_v2 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
+        self.MPNet_v3 = self._build_core_MPNet(model_params=model_params, encoder_feats_dict=encoder_feats_dict)
 
         self.num_enc_steps = model_params['num_enc_steps']
         self.num_class_steps = model_params['num_class_steps']
@@ -293,10 +294,11 @@ class MOTMPNet(nn.Module):
             # Message Passing Step
             latent_node_feats_v1, latent_edge_feats_v1 = self.MPNet(latent_node_feats, edge_index, latent_edge_feats)
             latent_node_feats_v2, latent_edge_feats_v2 = self.MPNet_v2(latent_node_feats, edge_index, latent_edge_feats)
+            latent_node_feats_v3, latent_edge_feats_v3 = self.MPNet_v3(latent_node_feats, edge_index, latent_edge_feats)
 
             #Concatenate multiply MPN
-            latent_node_feats = torch.cat([latent_node_feats_v1, latent_node_feats_v2], dim=1)
-            latent_edge_feats = torch.cat([latent_edge_feats_v1, latent_edge_feats_v2], dim=1)
+            latent_node_feats = torch.cat([latent_node_feats_v1, latent_node_feats_v2, latent_node_feats_v3], dim=1)
+            latent_edge_feats = torch.cat([latent_edge_feats_v1, latent_edge_feats_v2, latent_edge_feats_v3], dim=1)
             latent_node_feats = self.node_merge_fc(latent_node_feats)
             latent_edge_feats = self.edge_merge_fc(latent_edge_feats)
 

@@ -142,13 +142,13 @@ graph_model_params:
     use_batchnorm: False
 
   edge_merge_multiply_dict:
-    in_dim: 32
+    in_dim: 48
     out_dim: [16]
     dropout_p: 0
     use_batchnorm: False
 
   node_merge_multiply_dict:
-    in_dim: 64
+    in_dim: 96
     out_dim: [32]
     dropout_p: 0
     use_batchnorm: False
