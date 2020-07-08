@@ -345,17 +345,13 @@ class MOTMPNet(nn.Module):
                 flow_out_row, flow_out_col = row[flow_out_mask], col[flow_out_mask]
                 flow_out_edge_weigh = dec_edge_weigh[flow_out_mask]
                 flow_out = node_feats_set['flow_out']
-                # flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0, flow_out_edge_weigh)
-                flow_out = self.node_agg_fn(flow_out, flow_out_row, x_size0)
+                flow_out = self.node_agg_fn(flow_out * flow_out_edge_weigh.reshape(-1, 1), flow_out_row, x_size0)
 
                 flow_in_mask = row > col
                 flow_in_row, flow_in_col = row[flow_in_mask], col[flow_in_mask]
                 flow_in_edge_weigh = dec_edge_weigh[flow_in_mask]
                 flow_in = node_feats_set['flow_in']
-                t = time.time()
-                # flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0, flow_in_edge_weigh)
-                flow_in = self.node_agg_fn(flow_in, flow_in_row, x_size0)
-                print(f'node_agg_fn function cost {time.time() - t}s')
+                flow_in = self.node_agg_fn(flow_in * flow_in_edge_weigh.reshape(-1, 1), flow_in_row, x_size0)
 
                 flow = torch.cat((flow_in, flow_out), dim=1)
 

@@ -16,7 +16,7 @@ SETTINGS.CONFIG.READ_ONLY_CONFIG=False
 
 ex = Experiment()
 ex.add_config('configs/tracking_cfg.yaml')
-ex.add_config({'ckpt_path': 'trained_models/graph_nets/mot_mpnet_epoch_006.ckpt',
+ex.add_config({'ckpt_path': 'output/experiments/07-08_09:07_train_weighedge/checkpoints/epoch_025.ckpt',
                'run_id': 'evaluation',
                'add_date': True,
                'precomputed_embeddings': True})
