@@ -102,13 +102,25 @@ class MOTNeuralSolver(pl.LightningModule):
         else: # If there are no positives labels, avoid dividing by zero
             pos_weight = 0
 
+        #prepare node loss
+        row, col = batch.edge_index
+        edge_labels = batch.edge_labels
+        mes_loss = nn.MSELoss(reduction='none')
+        omiga = 1 / pos_weight / 10
+
         # Compute Weighted BCE:
-        loss = 0
+        edge_loss = 0
+        node_loss = 0
+        loss=0
         num_steps = len(outputs['classified_edges'])
         for step in range(num_steps):
-            loss += F.binary_cross_entropy_with_logits(outputs['classified_edges'][step].view(-1),
+            edge_loss += F.binary_cross_entropy_with_logits(outputs['classified_edges'][step].view(-1),
                                                             batch.edge_labels.view(-1),
                                                             pos_weight= pos_weight)
+            node_loss += torch.sum((1 - edge_labels) * mes_loss(outputs['node_feats'][0][row],
+                                                          outputs['node_feats'][step+1][col]).mean(dim=1))
+
+            loss = edge_loss + omiga * node_loss
         return loss
 
     def _train_val_step(self, batch, batch_idx, train_val):

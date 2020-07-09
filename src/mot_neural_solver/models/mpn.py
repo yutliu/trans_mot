@@ -308,7 +308,8 @@ class MOTMPNet(nn.Module):
         # During training, the feature vectors that the MPNetwork outputs for the  last self.num_class_steps message
         # passing steps are classified in order to compute the loss.
         first_class_step = self.num_enc_steps - self.num_class_steps + 1
-        outputs_dict = {'classified_edges': [], 'node_loss':[]}
+        outputs_dict = {'classified_edges': [], 'node_feats':[]}
+        outputs_dict['node_feats'].append(latent_node_feats)
         for step in range(1, self.num_enc_steps + 1):
 
             # Reattach the initially encoded embeddings before the update
@@ -357,6 +358,7 @@ class MOTMPNet(nn.Module):
 
                 flow = torch.cat((flow_in, flow_out), dim=1)
                 latent_node_feats = self.node_mlp(flow)
+                outputs_dict['node_feats'].append(latent_node_feats)
 
 
             else:
